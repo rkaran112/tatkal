@@ -125,7 +125,7 @@ GitHub Actions runs three jobs on every push: backend tests against real Postgre
 
 ## Deploy
 
-[`deploy/aws-ec2.md`](deploy/aws-ec2.md) puts the whole system on one AWS server. [`deploy/bootstrap.sh`](deploy/bootstrap.sh) is pasted into the server's "user data" box at launch, and the server installs Docker, builds the app and starts it by itself. The public demo frees all seats every 15 minutes, and the admin endpoints used by the load test are not reachable from the internet.
+[`deploy/aws-ec2.md`](deploy/aws-ec2.md) puts the whole system on one small AWS server (a 1 GB `t3.micro`, about $12.50 a month). GitHub Actions builds the two Docker images once and publishes them; [`deploy/bootstrap.sh`](deploy/bootstrap.sh) is pasted into the server's "user data" box at launch, and the server installs Docker, downloads the images and starts everything by itself, with memory limits that suit 1 GB ([`docker-compose.prod.yml`](docker-compose.prod.yml)). The public demo frees all seats every 15 minutes, the admin endpoints are not reachable from the internet, and the server stops itself after 170 days so a forgotten demo cannot use up credits.
 
 ## Interview talking points
 

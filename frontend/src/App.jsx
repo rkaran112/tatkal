@@ -20,6 +20,8 @@ export default function App() {
 
   // Ask the backend for the seat map now, and again every 2 seconds.
   async function refreshSeats() {
+    // Nobody is looking at a hidden tab, so do not bother the server for it.
+    if (document.hidden) return;
     const { ok, data } = await getSeats();
     if (ok) setSeats(data);
   }

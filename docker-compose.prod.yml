@@ -1,0 +1,87 @@
+# The lean version used on the AWS server (1 GB of memory). It PULLS images that GitHub Actions
+# already built, so the server never has to compile anything.
+#
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Memory budget for a 1 GB server (the numbers add up to roughly 750 MB, the rest is the OS):
+#   backend 512m cap (Java heap 256m), postgres 192m, redis 48m, frontend 32m.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"      # keep log files small so the 10 GB disk never fills up
+    max-file: "3"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    mem_limit: 192m
+    logging: *logging
+    environment:
+      POSTGRES_DB: tatkal
+      POSTGRES_USER: tatkal
+      POSTGRES_PASSWORD: tatkal       # fine: this container is not reachable from outside the server
+    command:
+      - postgres
+      - -c
+      - shared_buffers=48MB
+      - -c
+      - max_connections=30
+      - -c
+      - work_mem=2MB
+      - -c
+      - maintenance_work_mem=16MB
+      - -c
+      - effective_cache_size=128MB
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tatkal -d tatkal"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    mem_limit: 48m
+    logging: *logging
+    # Holds only live for 5 minutes, so nothing needs saving to disk.
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "24mb", "--maxmemory-policy", "volatile-ttl"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    image: ghcr.io/rkaran112/tatkal-backend:latest
+    restart: unless-stopped
+    mem_limit: 512m
+    logging: *logging
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/tatkal
+      DB_USER: tatkal
+      DB_PASSWORD: tatkal
+      REDIS_HOST: redis
+      TATKAL_ADMIN_ENABLED: "true"                    # used by the 15-minute reset job; nginx hides it
+      # Keep Java small: 256 MB heap, simple garbage collector, fewer compiler threads.
+      JAVA_TOOL_OPTIONS: "-Xmx256m -Xss512k -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -XX:TieredStopAtLevel=1"
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: "10"   # a demo does not need 20 database connections
+      SERVER_TOMCAT_THREADS_MAX: "40"
+    ports:
+      - "127.0.0.1:8080:8080"                         # this server only, never the internet
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    image: ghcr.io/rkaran112/tatkal-frontend:latest
+    restart: unless-stopped
+    mem_limit: 32m
+    logging: *logging
+    ports:
+      - "80:80"
+    depends_on:
+      - backend

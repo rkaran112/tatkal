@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -95,6 +97,26 @@ public class HoldBookingService {
     /** Who is holding this seat right now? null if nobody. Used by the seat map too. */
     public String holderOf(Long seatId) {
         return redis.opsForValue().get(keyFor(seatId));
+    }
+
+    /**
+     * Who holds each of these seats? Asks Redis ONCE for all of them (MGET), instead of
+     * once per seat. The seat map is refreshed often, so this saves a lot of round trips.
+     * The answer is in the same order as seatIds; null means nobody holds that seat.
+     */
+    public List<String> holdersOf(List<Long> seatIds) {
+        List<String> keys = new ArrayList<>();
+        for (Long seatId : seatIds) {
+            keys.add(keyFor(seatId));
+        }
+        List<String> holders = redis.opsForValue().multiGet(keys);
+        if (holders == null) {
+            holders = new ArrayList<>();
+            for (int i = 0; i < seatIds.size(); i++) {
+                holders.add(null);
+            }
+        }
+        return holders;
     }
 
     /** Admin reset: drop every hold. */

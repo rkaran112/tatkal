@@ -26,10 +26,20 @@ public class SeatController {
 
     @GetMapping("/seats")
     public List<SeatView> seats() {
+        List<Seat> seats = seatRepository.findAllByOrderBySeatNo();
+
+        List<Long> seatIds = new ArrayList<>();
+        for (Seat seat : seats) {
+            seatIds.add(seat.getId());
+        }
+
+        // One question to Redis for all seats: who is holding what right now?
+        List<String> holders = holdBookingService.holdersOf(seatIds);
+
         List<SeatView> result = new ArrayList<>();
-        for (Seat seat : seatRepository.findAllByOrderBySeatNo()) {
-            String heldBy = holdBookingService.holderOf(seat.getId());   // asks Redis
-            result.add(new SeatView(seat.getId(), seat.getSeatNo(), seat.getStatus(), heldBy));
+        for (int i = 0; i < seats.size(); i++) {
+            Seat seat = seats.get(i);
+            result.add(new SeatView(seat.getId(), seat.getSeatNo(), seat.getStatus(), holders.get(i)));
         }
         return result;
     }
