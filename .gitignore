@@ -1,0 +1,10 @@
+target/
+.mvn/wrapper/maven-wrapper.jar
+node_modules/
+dist/
+.idea/
+*.iml
+.vscode/
+HELP.md
+.env
+.run/

@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # 1. Compile the backend and run its tests against real PostgreSQL and Redis.
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: tatkal_test
+          POSTGRES_USER: tatkal
+          POSTGRES_PASSWORD: tatkal
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U tatkal"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      - run: chmod +x mvnw && ./mvnw -B verify
+
+  # 2. Make sure the React page builds.
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+  # 3. Start everything with docker compose, then run the race.
+  #    The build FAILS if version 2 or version 3 ever sells a seat twice.
+  compose-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Start the whole system
+        run: docker compose up -d --build
+
+      - name: Wait for the backend to be healthy
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8080/actuator/health > /dev/null; then
+              echo "backend is up"; exit 0
+            fi
+            sleep 3
+          done
+          echo "backend did not start"; docker compose logs backend; exit 1
+
+      - name: The web page is served through nginx
+        run: curl -sf http://localhost/ | grep -q "Tatkal"
+
+      - name: Race (v1 may double-book; v2 and v3 must not)
+        run: |
+          java loadtest/LoadTest.java http://localhost:8080 v1 200 same-seat no-csv
+          java loadtest/LoadTest.java http://localhost:8080 v2 200 same-seat no-csv
+          java loadtest/LoadTest.java http://localhost:8080 v3 200 same-seat no-csv
+          java loadtest/LoadTest.java http://localhost:8080 v2 200 spread no-csv
+          java loadtest/LoadTest.java http://localhost:8080 v3 200 spread no-csv
+
+      - name: Show logs if something failed
+        if: failure()
+        run: docker compose logs

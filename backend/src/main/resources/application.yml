@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: tatkal
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/tatkal}
+    username: ${DB_USER:tatkal}
+    password: ${DB_PASSWORD:tatkal}
+    hikari:
+      # How many database connections the app may hold at once.
+      # This matters for the row-lock numbers: 1000 users fight over 20 connections.
+      maximum-pool-size: 20
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate   # Flyway builds the tables; Hibernate only checks them
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+tatkal:
+  # How long a seat stays held while the user "pays". Tests use a few seconds.
+  hold-duration: PT5M
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

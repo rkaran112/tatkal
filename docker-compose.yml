@@ -1,0 +1,46 @@
+# Starts the whole system:  docker compose up --build
+#   web page      -> http://localhost
+#   backend API   -> http://localhost:8080   (the load test talks to this directly)
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: tatkal
+      POSTGRES_USER: tatkal
+      POSTGRES_PASSWORD: tatkal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tatkal -d tatkal"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build: ./backend
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/tatkal
+      DB_USER: tatkal
+      DB_PASSWORD: tatkal
+      REDIS_HOST: redis
+      TATKAL_ADMIN_ENABLED: "true"      # needed by the load test; nginx hides it from the public
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend

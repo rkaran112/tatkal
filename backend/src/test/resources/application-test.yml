@@ -1,0 +1,10 @@
+# Used by the tests (@ActiveProfiles("test")). Everything else comes from application.yml.
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/tatkal_test}   # a separate database, so tests never touch your demo data
+  data:
+    redis:
+      database: 1                                                # a separate Redis database for the same reason
+
+tatkal:
+  hold-duration: PT2S                                            # short, so the expiry test does not wait 5 minutes
