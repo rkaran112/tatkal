@@ -92,6 +92,9 @@ export default function App() {
       </p>
 
       <p className="message">{message}</p>
+      {window.location.hostname !== "localhost" && (
+        <p className="small">Demo site: all seats are freed again every 15 minutes.</p>
+      )}
 
       {myHold && (
         <div className="holdBox">

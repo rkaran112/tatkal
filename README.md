@@ -10,33 +10,37 @@ It has three versions of "book a seat". A load test sends **1,000 people at one 
 |---|---|---|
 | **v1 Naive** | Read the seat, if it is free, save the booking | **Double-books.** The same seat is sold to many people. |
 | **v2 Row lock** | Same, but the database locks the seat row while one person is booking it (`SELECT ... FOR UPDATE`) | Correct every time. Requests for one seat are served one by one. |
-| **v3 Redis hold** | Like the real site: *hold* the seat for 5 minutes, then *pay* to confirm. Redis decides who gets the hold. | Correct every time, and the fastest. |
+| **v3 Redis hold** | Like the real site: *hold* the seat for 5 minutes, then *pay* to confirm. Redis decides who gets the hold. | Correct every time, and faster than the row lock when everyone wants the same seat. |
 
 Built with Java 21, Spring Boot, PostgreSQL, Redis, React, Docker and GitHub Actions.
 
 ## The results
 
-1,000 users, all fired at the same moment. Each row is the median of 3 races, after one warm-up race.
-"Seats sold twice" is the **worst** of the 3 races.
+1,000 users, all fired at the same moment. Each row is the median of 5 races, after one warm-up race.
+"Seats sold twice" is the **worst** of the 5 races. The last column is the median requests per second, with the slowest and fastest race in brackets.
 
-| Version | Scenario | Seats sold twice | Booking rows | p50 ms | p95 ms | p99 ms | Requests/s |
+| Version | Scenario | Seats sold twice | Booking rows | p50 ms | p95 ms | p99 ms | Requests/s (min-max) |
 |---|---|---|---|---|---|---|---|
-| v1 Naive | same-seat | 1 | 17 | 1496 | 3476 | 3852 | 149 |
-| v2 Row lock | same-seat | 0 | 1 | 2133 | 4367 | 4920 | 120 |
-| v3 Redis hold | same-seat | 0 | 1 | 1603 | 2115 | 2456 | 298 |
-| v1 Naive | spread | 10 | 78 | 1424 | 3983 | 4379 | 147 |
-| v2 Row lock | spread | 0 | 72 | 1857 | 4531 | 5954 | 134 |
-| v3 Redis hold | spread | 0 | 72 | 1230 | 2576 | 3092 | 211 |
+| v1 Naive | same-seat | 1 | 18 | 798 | 1351 | 1503 | 499 (439-637) |
+| v2 Row lock | same-seat | 0 | 1 | 1226 | 2597 | 2743 | 350 (269-450) |
+| v3 Redis hold | same-seat | 0 | 1 | 513 | 1309 | 1405 | 575 (545-667) |
+| v1 Naive | spread | 22 | 99 | 762 | 1629 | 1806 | 541 (465-588) |
+| v2 Row lock | spread | 0 | 72 | 601 | 1289 | 1450 | 523 (455-572) |
+| v3 Redis hold | spread | 0 | 72 | 1035 | 1757 | 2115 | 420 (329-475) |
 
 - **same-seat**: all 1,000 people want seat 1. The right answer is **1** booking.
 - **spread**: each person picks one of the 72 seats. The right answer is **72** bookings.
-- Version 1 sold 17 tickets for one seat, and in the spread race 78 tickets for 72 seats.
-- Versions 2 and 3 sold exactly 1 and exactly 72, in every one of their races.
-- 0 request errors in all 18 recorded races.
 
-**How to read the speed numbers honestly.** Everything ran on one laptop: the load test, the Spring Boot app, PostgreSQL and Redis (the last two inside WSL). 1,000 simultaneous requests compete for that one machine, so the absolute milliseconds are inflated. Compare the versions with each other, not with a real production server. Raw data: [`docs/results/results.csv`](docs/results/results.csv).
+**Correctness (this result is solid).** Version 1 sold the one seat 18 times (median; between 4 and 20 times in the 8 same-seat races I ran over two sessions). In the spread race it sold 99 tickets for 72 seats, with 7 to 22 seats sold twice. Versions 2 and 3 sold exactly 1 and exactly 72 in every one of their 16 races each: zero double-bookings.
 
-**Why does v1 never sell more than about 20 copies?** The app has 20 database connections. Only requests that are *in the middle of booking at the same moment* can collide, and at most 20 can be at that point at once. The numbers I saw across runs were 4, 11, 17 and 20.
+**Speed (treat as rough).**
+- When everyone wants the same seat, the Redis hold served more requests per second than the row lock in every race of both sessions: 575 against 350 in the table above (about 1.6x), and about 2.5x in my first, busier session.
+- When people spread over the seats, the three versions were close and the order changed between sessions. In the table above v3 is the slowest of the three. I have not investigated why.
+- v2 and v3 had no request errors. Two v1 spread races had connection errors (97 and 42 of 1,000), where the operating system refused some of the simultaneous connections.
+
+**How to read the numbers honestly.** Everything ran on one laptop: the load test, the Spring Boot app, PostgreSQL and Redis (the last two inside WSL). The same test gave roughly 3x higher requests per second in the second session than in the first, because the laptop was busier the first time. So absolute speed is not stable. Compare the versions within one session, and do not compare them with a real production server. Raw data: [`docs/results/results.csv`](docs/results/results.csv).
+
+**Why does v1 never sell more than about 20 copies?** The app has 20 database connections. Only requests that are *in the middle of booking at the same moment* can collide, and at most 20 can be at that point at once. The same-seat counts I saw were 4, 6, 11, 17, 18, 18, 20 and 20.
 
 ## Read the code in this order
 
@@ -119,6 +123,10 @@ node loadtest/summarize.mjs
 
 GitHub Actions runs three jobs on every push: backend tests against real PostgreSQL and Redis, the frontend build, and a docker-compose smoke test that starts the whole system and races 200 users. **The build fails if version 2 or version 3 ever sells a seat twice.**
 
+## Deploy
+
+[`deploy/aws-ec2.md`](deploy/aws-ec2.md) puts the whole system on one AWS server. [`deploy/bootstrap.sh`](deploy/bootstrap.sh) is pasted into the server's "user data" box at launch, and the server installs Docker, builds the app and starts it by itself. The public demo frees all seats every 15 minutes, and the admin endpoints used by the load test are not reachable from the internet.
+
 ## Interview talking points
 
 **"How do you stop two people booking the same seat?"** Walk through the three versions in the table. The answer is: make "check if free" and "mark as taken" one indivisible step.
@@ -129,7 +137,7 @@ GitHub Actions runs three jobs on every push: backend tests against real Postgre
 - **v3 trade-off.** Losers are turned away in one fast Redis call without touching the database. The cost is an extra moving part, and a hold that can expire.
 - **Redis is atomic.** It runs one command at a time, so `SET NX` has exactly one winner out of 1,000.
 - **What if Redis loses the holds (restart or crash)?** Confirming still runs `UPDATE ... WHERE status = 'AVAILABLE'`, so the database refuses a second booking of the same seat. Redis is the fast front door; PostgreSQL stays the final judge.
-- **The pool-size observation.** v1 never sold more than about 20 copies because the pool has 20 connections. A good example of reading your own results.
+- **The pool-size observation.** v1 never sold more than 20 copies in any race because the pool has 20 connections. A good example of reading your own results.
 
 **What I would add in production** (deliberately left out to keep this readable):
 - `UNIQUE (seat_id)` on `booking`, so even v1 would fail loudly instead of silently double-booking.

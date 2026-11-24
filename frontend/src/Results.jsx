@@ -36,12 +36,14 @@ export default function Results() {
               <td className={row.doubleBooked > 0 ? "bad" : "good"}>{row.doubleBooked}</td>
               <td>{row.bookings}</td>
               <td>{row.p95}</td>
-              <td>{row.reqPerSec}</td>
+              <td>
+                {row.reqPerSec} ({row.reqPerSecMin}-{row.reqPerSecMax})
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
-      <p className="small">Median of 3 runs each. Same laptop, database and Redis running locally.</p>
+      <p className="small">Median of 5 races each; requests/s also shows the slowest and fastest race. All run on one laptop, so compare the rows with each other, not with a real server. When everyone wants the same seat the Redis hold is consistently faster than the row lock; when people spread out, the order is not stable.</p>
     </section>
   );
 }

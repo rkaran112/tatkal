@@ -1,85 +1,55 @@
-# Deploy to AWS EC2 (one small server, docker compose)
+# Put Tatkal on the internet (AWS EC2, one small server)
 
-Goal: the same `docker compose up` you run on your laptop, on one AWS server that anyone can open in a browser.
+Goal: a public web address anyone can open, running the same `docker compose` setup you run on your laptop.
+You do the AWS console steps yourself (an account, a server, a few clicks). Everything on the server sets itself up from one pasted script, [`bootstrap.sh`](bootstrap.sh). You never type a command on the server.
 
-**Cost.** AWS accounts created after 15 July 2025 get a *Free plan*: up to $200 of credits that last 6 months at most. When the credits or the 6 months run out, the account is closed and you are not billed. Older accounts are on the previous 12-month free tier, which may already have ended. Check what your account shows under **Billing > Free Tier** before you start.
+**Cost.** AWS accounts created after 15 July 2025 get a *Free plan*: up to $200 of credits for at most 6 months. When the credits or the 6 months run out, the account closes and you are not billed. Older accounts are on the previous 12-month free tier, which may have ended. Check **Billing > Free Tier** for what your account shows. Do not paste your AWS password, keys or card details into any chat.
 
-Everything below is done by you in the AWS console. Do not paste your AWS keys or passwords into any chat.
+## 1. Before you launch (5 minutes)
 
-## 1. Before you launch
+1. Create or open your AWS account and choose the **Free plan**.
+2. **Billing > Budgets**: create a budget alert (for example $5) that emails you.
+3. Pick a region near you, such as Mumbai (`ap-south-1`).
 
-1. Create (or open) your AWS account and choose the **Free plan**.
-2. In **Billing > Budgets**, create a budget alert (for example $5) that emails you. This is a safety net.
-3. Pick a region close to you (Mumbai, `ap-south-1`).
+## 2. Launch the server (10 minutes)
 
-## 2. Launch the server
-
-In **EC2 > Launch instance**:
+**EC2 > Launch instance**, then:
 
 | Setting | Value |
 |---|---|
-| Image | Ubuntu Server 24.04 LTS |
-| Instance type | One marked **Free tier eligible** in the list. Prefer one with **2 GB of memory or more** (Spring Boot + PostgreSQL + Redis + nginx are tight in 1 GB). |
-| Key pair | Create one, download the `.pem` file, keep it private |
+| Name | `tatkal` |
+| Image | **Ubuntu Server 24.04 LTS** |
+| Instance type | Any type marked **Free tier eligible** with **2 GB of memory or more** if one is offered. (1 GB can work because the script adds swap, but the first build is slow.) |
+| Key pair | **Proceed without a key pair**. You will not need to log in. |
+| Network settings | Create a security group that allows **HTTP (port 80) from anywhere**. Do **not** allow SSH, and open nothing else. |
 | Storage | 20 GB gp3 |
-| Security group | **SSH (22) from "My IP" only. HTTP (80) from anywhere.** Nothing else. |
+| **Advanced details > User data** | Open [`deploy/bootstrap.sh`](bootstrap.sh), copy the **whole file**, paste it here |
 
-Do **not** open ports 8080, 5432 or 6379 to the internet. The database and Redis have the demo password `tatkal`, and port 8080 exposes the admin reset endpoint.
+Click **Launch instance**.
 
-## 3. Install Docker on the server
+## 3. Wait, then open it
 
-Connect (replace the address with your instance's public IP):
+The server installs Docker, downloads the code from GitHub, builds the Java app and the web page, and starts everything. The first time this takes **about 5 to 10 minutes**.
 
-```
-ssh -i path\to\key.pem ubuntu@<public-ip>
-```
+When the instance shows *Running*, copy its **Public IPv4 address** and open `http://<that address>` in a browser. Use `http`, not `https`. If it does not load yet, wait a few minutes and refresh.
 
-Then on the server:
+**If it still does not appear after 15 minutes:** in the EC2 console, select the instance, then **Actions > Monitor and troubleshoot > Get system log**. The end of that log shows what the setup script was doing and where it failed. Copy the last 40 lines and send them to me.
 
-```
-sudo apt update
-sudo apt install -y docker.io docker-compose-v2 git openjdk-21-jdk-headless
-sudo usermod -aG docker ubuntu
-```
+## 4. What the public demo does
 
-Log out and back in once so the `docker` group applies.
+- Anyone can hold and book seats, so the seats would stay booked forever. The script adds a job that **frees all seats every 15 minutes**, and the page says so.
+- The helper endpoints for the load test (`/api/admin/...`) answer 404 from the internet, and the backend port is open to the server itself only. The database and Redis are not reachable from outside either.
 
-If the instance has only 1 GB of memory, add swap before building:
+## 5. Optional: run the race on the server
 
-```
-sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
-```
-
-## 4. Get the code and start it
-
-```
-git clone https://github.com/<your-account>/tatkal.git
-cd tatkal
-docker compose up -d --build
-```
-
-The first build takes a few minutes. Check it:
-
-```
-curl -s http://localhost:8080/actuator/health
-```
-
-Then open `http://<public-ip>` in your browser. You should see the seat map.
-
-## 5. Run the race on the server (optional but nice for the README)
-
-```
-bash loadtest/run-all.sh
-cp docs/results/results.csv docs/results/results-ec2.csv
-```
-
-Copy `results-ec2.csv` back to your laptop with `scp` and add a short "on EC2" table to the README. Say plainly that the load test ran on the same small machine as the app.
+You would need a way to log in (SSH or EC2 Instance Connect), which this setup deliberately leaves closed. The race results in the README were measured on a laptop. If you want server numbers too, ask me and we will open a login for your IP only.
 
 ## 6. Switch it off when you are done
 
-An idle server still uses your credits. When the demo period is over, **terminate the instance** in the EC2 console (stop is not enough for the disk). Delete the budget too if you like.
+An idle server uses your credits. When the demo period is over, **terminate the instance** (stopping it still bills for the disk) and delete the budget if you like.
 
-## What this setup does not have
+## What this does not have
 
-- No HTTPS or domain name. It is plain `http://` on the server's IP. (A small reverse proxy such as Caddy would add HTTPS later.)
-- No automatic restarts after a server reboot beyond Docker's defaults, no backups, one server only. Fine for a portfolio demo.
+- No HTTPS and no domain name: it is plain `http://` on the server's IP. A domain and HTTPS can be added later with a small reverse proxy.
+- No backups and only one server. That is fine for a portfolio demo.
+- The address is a bare IP. If the instance is stopped and started, the IP changes unless you attach an **Elastic IP** (free while attached to a running instance).

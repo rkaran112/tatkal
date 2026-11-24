@@ -6,7 +6,7 @@
 #   - 1 warm-up race that is NOT recorded (the first race against a freshly
 #     started server is slower and can fail to connect, which says nothing
 #     about the booking method)
-#   - 3 recorded races
+#   - 5 recorded races (RUNS=3 bash loadtest/run-all.sh for fewer)
 #
 # Usage, from the repo root, with the backend already running:
 #   bash loadtest/run-all.sh [base-url] [users]
@@ -16,6 +16,7 @@
 
 BASE_URL="${1:-http://localhost:8080}"
 USERS="${2:-1000}"
+RUNS="${RUNS:-5}"          # recorded races per configuration (set RUNS=3 for a quicker run)
 
 rm -f docs/results/results.csv
 
@@ -24,7 +25,7 @@ for scenario in same-seat spread; do
     echo "=== $strategy / $scenario: warm-up ==="
     java loadtest/LoadTest.java "$BASE_URL" "$strategy" "$USERS" "$scenario" no-csv > /dev/null || true
 
-    for run in 1 2 3; do
+    for run in $(seq 1 "$RUNS"); do
       echo "=== $strategy / $scenario: run $run ==="
       java loadtest/LoadTest.java "$BASE_URL" "$strategy" "$USERS" "$scenario" || {
         if [ "$strategy" != "v1" ]; then

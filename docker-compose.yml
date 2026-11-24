@@ -1,9 +1,10 @@
 # Starts the whole system:  docker compose up --build
 #   web page      -> http://localhost
-#   backend API   -> http://localhost:8080   (the load test talks to this directly)
+#   backend API   -> http://localhost:8080   (only from this machine; the load test uses it)
 services:
   postgres:
     image: postgres:16
+    restart: unless-stopped
     environment:
       POSTGRES_DB: tatkal
       POSTGRES_USER: tatkal
@@ -16,6 +17,7 @@ services:
 
   redis:
     image: redis:7
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 3s
@@ -24,6 +26,7 @@ services:
 
   backend:
     build: ./backend
+    restart: unless-stopped
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/tatkal
       DB_USER: tatkal
@@ -31,7 +34,7 @@ services:
       REDIS_HOST: redis
       TATKAL_ADMIN_ENABLED: "true"      # needed by the load test; nginx hides it from the public
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"           # reachable from the host only, never from the internet
     depends_on:
       postgres:
         condition: service_healthy
@@ -40,6 +43,7 @@ services:
 
   frontend:
     build: ./frontend
+    restart: unless-stopped
     ports:
       - "80:80"
     depends_on:

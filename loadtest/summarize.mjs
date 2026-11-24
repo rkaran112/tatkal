@@ -4,7 +4,7 @@
 //
 // Run from the repo root:  node loadtest/summarize.mjs
 //
-// Each configuration was raced 3 times. We report the MEDIAN of the speed numbers,
+// Each configuration was raced several times (5 by default). We report the MEDIAN of the speed numbers,
 // but the WORST case for "seats sold twice" (one bad run is the one that matters).
 
 import { readFileSync, writeFileSync } from "node:fs";
@@ -53,6 +53,8 @@ for (const key of Object.keys(groups)) {
     p95: median(column("p95_ms")),
     p99: median(column("p99_ms")),
     reqPerSec: median(column("req_per_sec")),
+    reqPerSecMin: Math.min(...column("req_per_sec")),
+    reqPerSecMax: Math.max(...column("req_per_sec")),
   });
 }
 
@@ -63,10 +65,10 @@ rows.sort((a, b) => a.scenario.localeCompare(b.scenario) || a.strategy.localeCom
 writeFileSync("frontend/public/results.json", JSON.stringify(rows, null, 2));
 
 // 4. The Markdown table.
-let md = "| Version | Scenario | Seats sold twice | Booking rows | p50 ms | p95 ms | p99 ms | Requests/s |\n";
+let md = "| Version | Scenario | Seats sold twice | Booking rows | p50 ms | p95 ms | p99 ms | Requests/s (min-max) |\n";
 md += "|---|---|---|---|---|---|---|---|\n";
 for (const r of rows) {
-  md += `| ${r.name} | ${r.scenario} | ${r.doubleBooked} | ${r.bookings} | ${r.p50} | ${r.p95} | ${r.p99} | ${r.reqPerSec} |\n`;
+  md += `| ${r.name} | ${r.scenario} | ${r.doubleBooked} | ${r.bookings} | ${r.p50} | ${r.p95} | ${r.p99} | ${r.reqPerSec} (${r.reqPerSecMin}-${r.reqPerSecMax}) |\n`;
 }
 writeFileSync("docs/results/results.md", md);
 
