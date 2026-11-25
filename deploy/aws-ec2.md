@@ -4,16 +4,16 @@ Goal: a public web address anyone can open. You do the AWS console steps yoursel
 
 ## What it costs
 
-Rough monthly cost for one server running all the time in Mumbai (prices from third-party price lists, so treat them as estimates):
+Rough monthly cost for one server running all the time in Sydney (prices from third-party price lists, so treat them as estimates):
 
 | Item | About |
 |---|---|
-| `t3.micro` server (1 GB), $0.0112 per hour | $8.20 |
+| `t3.micro` server (1 GB), $0.0132 per hour | $9.65 |
 | Public IPv4 address, $0.005 per hour | $3.65 |
 | 10 GB disk | under $1 |
-| **Total** | **about $12.50 per month** |
+| **Total** | **about $14 per month** |
 
-On the **Free plan**, your AWS credits (up to $200, for at most 6 months) pay for this. Six months is about **$75**, so it fits, but leaves little spare, so do not run anything else. When the credits or the 6 months run out, the account closes and you are not billed. **Never click "Upgrade to a paid plan".** Budgets only send emails; they do not stop anything.
+On the **Free plan**, your AWS credits (up to $200, for at most 6 months) pay for this. Six months is about **$86**, so it fits within the $100 you get at sign-up, but leaves little spare, so do not run anything else. When the credits or the 6 months run out, the account closes and you are not billed. **Never click "Upgrade to a paid plan".** Budgets only send emails; they do not stop anything.
 
 Two guards are built in so a forgotten server cannot drain your credits:
 - The server **stops itself after 170 days** (a timer set by the script). A stopped server costs almost nothing. Start it again from the console if you want it back (its address will change).
@@ -25,7 +25,7 @@ Do not enter your AWS password, keys or card details into any chat.
 
 1. Create or open your AWS account and choose the **Free plan**. Check **Billing > Free Tier** shows your credits and expiry date.
 2. **Billing > Budgets**: create a budget alert and also a **Zero spend budget**, so you get an email the moment anything is charged.
-3. Pick a region near you, such as Mumbai (`ap-south-1`).
+3. **Region.** AWS's newer sign-up fixes your region from your contact address and shows no region picker (an account with an Indian address gets **Sydney**, `ap-southeast-2`). Use the one you are given. Older-style accounts can pick any region; Mumbai (`ap-south-1`) is a little cheaper.
 
 ## 2. Launch the server
 
@@ -37,7 +37,7 @@ Do not enter your AWS password, keys or card details into any chat.
 | Image | **Ubuntu Server 24.04 LTS** |
 | Instance type | **`t3.micro`** (1 GB, marked Free tier eligible) |
 | Key pair | **Proceed without a key pair**. You will not need to log in. |
-| Network settings | A security group that allows **HTTP (port 80) from anywhere** and **nothing else** (no SSH). Leave the default public IP setting on. Do **not** add an Elastic IP: an unused one is billed. |
+| Network settings | Tick **only** "Allow HTTP traffic from the internet". Leave "Allow SSH" (ticked by default) and "Allow HTTPS" **unticked**. Leave the default public IP setting on. Do **not** add an Elastic IP: an unused one is billed. |
 | Storage | **10 GB** gp3 |
 | **Advanced details > Credit specification** | **Standard** (the default for t3 is "Unlimited", which can bill extra) |
 | **Advanced details > User data** | Open [`deploy/bootstrap.sh`](bootstrap.sh) on GitHub, copy the **whole file**, paste it here |

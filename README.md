@@ -4,6 +4,8 @@ At 10 am on Tatkal day, thousands of people click the same seat at the same mome
 
 > **What happens when two requests for the same seat arrive together?**
 
+**Live demo: http://3.107.106.233** (one small AWS server, plain `http`). Open it in two tabs: hold a seat in one and watch the other see it as taken. All seats are freed every 15 minutes.
+
 It has three versions of "book a seat". A load test sends **1,000 people at one seat at the same instant** to each version and counts what really ends up in the database.
 
 | Version | How it works | What the load test shows |
@@ -125,7 +127,7 @@ GitHub Actions runs three jobs on every push: backend tests against real Postgre
 
 ## Deploy
 
-[`deploy/aws-ec2.md`](deploy/aws-ec2.md) puts the whole system on one small AWS server (a 1 GB `t3.micro`, about $12.50 a month). GitHub Actions builds the two Docker images once and publishes them; [`deploy/bootstrap.sh`](deploy/bootstrap.sh) is pasted into the server's "user data" box at launch, and the server installs Docker, downloads the images and starts everything by itself, with memory limits that suit 1 GB ([`docker-compose.prod.yml`](docker-compose.prod.yml)). The public demo frees all seats every 15 minutes, the admin endpoints are not reachable from the internet, and the server stops itself after 170 days so a forgotten demo cannot use up credits.
+[`deploy/aws-ec2.md`](deploy/aws-ec2.md) puts the whole system on one small AWS server (a 1 GB `t3.micro`, about $14 a month in Sydney). GitHub Actions builds the two Docker images once and publishes them; [`deploy/bootstrap.sh`](deploy/bootstrap.sh) is pasted into the server's "user data" box at launch, and the server installs Docker, downloads the images and starts everything by itself, with memory limits that suit 1 GB ([`docker-compose.prod.yml`](docker-compose.prod.yml)). The public demo frees all seats every 15 minutes, the admin endpoints are not reachable from the internet, and the server stops itself after 170 days so a forgotten demo cannot use up credits.
 
 ## Interview talking points
 
