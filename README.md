@@ -54,7 +54,7 @@ Each file is short and has comments written for a learner.
 4. [`HoldBookingService`](backend/src/main/java/com/tatkal/booking/HoldBookingService.java): version 3, with the one Redis command that does the job (`setIfAbsent` = `SET key value NX EX 300`).
 5. [`LoadTest.java`](loadtest/LoadTest.java): how 1,000 people are fired at the same instant (a "start gun" latch plus virtual threads).
 6. Tests: [`LockedBookingConcurrencyTest`](backend/src/test/java/com/tatkal/LockedBookingConcurrencyTest.java) and [`HoldBookingServiceTest`](backend/src/test/java/com/tatkal/HoldBookingServiceTest.java).
-7. [`frontend/src/App.jsx`](frontend/src/App.jsx): the seat map, the hold countdown and the pay button.
+7. [`frontend/src/App.jsx`](frontend/src/App.jsx): the booking logic of the page (hold, countdown, pay). The parts it draws are in [`frontend/src/components/`](frontend/src/components/): the station board, the coach seat map, the booking panel and the results section.
 
 ## How version 3 works
 

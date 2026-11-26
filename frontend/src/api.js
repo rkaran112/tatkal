@@ -1,10 +1,19 @@
 // Small helpers that talk to the Spring Boot backend.
 // Every function returns { ok, data } so the page does not have to deal with fetch details.
+// If the server cannot be reached at all, "offline" is true.
 
 async function request(url, options) {
-  const response = await fetch(url, options);
-  const data = await response.json().catch(() => ({}));
-  return { ok: response.ok, data };
+  try {
+    const response = await fetch(url, options);
+    const data = await response.json().catch(() => ({}));
+    return { ok: response.ok, data };
+  } catch {
+    return {
+      ok: false,
+      offline: true,
+      data: { error: "Can't reach the server. Check your connection and try again." },
+    };
+  }
 }
 
 function postJson(url, body) {
